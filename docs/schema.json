@@ -399,6 +399,13 @@
       "type": "array",
       "description": "Post process options when saving a new change fragment.\nexample: yaml\n# build a GitHub link from author choice\npost:\n- key: AuthorLink\n  value: \"https://github.com/{{.Custom.Author}}\nchangeFormat: \"* {{.Body}} by [{{.Custom.Author}}]({{.Custom.AuthorLink}})\""
     },
+    "batchCommand": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array",
+      "description": "Batch command runs once for each change when batching.\nThe command receives the change as JSON on stdin, including its filename, and must return\nthe replacement custom value as a JSON object on stdout.\nThe command and each argument are separate list items and are executed without a shell.\nexample: yaml\nbatchCommand:\n- ./scripts/augment-change\n- --repository\n- miniscruff/changie"
+    },
     "envPrefix": {
       "type": "string",
       "description": "Prefix of environment variables to load for templates.\nThe prefix is removed from resulting key map.\nexample: yaml\n# if we have an environment variable like so:\n# export CHANGIE_PROJECT=changie\n# we can use that in our templates if we set the prefix\nenvPrefix: \"CHANGIE_\"\nversionFormat: \"New release for {{.Env.PROJECT}}\""

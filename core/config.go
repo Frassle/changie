@@ -366,6 +366,16 @@ type Config struct {
 	//   value: "https://github.com/{{.Custom.Author}}
 	// changeFormat: "* {{.Body}} by [{{.Custom.Author}}]({{.Custom.AuthorLink}})"
 	Post []PostProcessConfig `yaml:"post,omitempty"`
+	// Batch command runs once for each change when batching.
+	// The command receives the change as JSON on stdin, including its filename, and must return
+	// the replacement custom value as a JSON object on stdout.
+	// The command and each argument are separate list items and are executed without a shell.
+	// example: yaml
+	// batchCommand:
+	// - ./scripts/augment-change
+	// - --repository
+	// - miniscruff/changie
+	BatchCommand []string `yaml:"batchCommand,omitempty"`
 	// Prefix of environment variables to load for templates.
 	// The prefix is removed from resulting key map.
 	// example: yaml

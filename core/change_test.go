@@ -1,7 +1,9 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -56,6 +58,98 @@ func TestLoadChangeFromPath(t *testing.T) {
 	then.Nil(t, err)
 	then.Equals(t, "A", change.Kind)
 	then.Equals(t, "hey", change.Body)
+}
+
+func TestAugmentCommand(t *testing.T) {
+	changeTime := time.Date(2026, time.June, 15, 10, 30, 0, 0, time.UTC)
+	change := Change{
+		Project:   "project",
+		Component: "component",
+		Kind:      "kind",
+		Body:      "some body",
+		Time:      changeTime,
+		Custom:    map[string]string{"Existing": "value"},
+		Filename:  "some_file.yaml",
+		KindKey:   "kind-key",
+		KindLabel: "Kind Label",
+	}
+
+	augmented, err := AugmentCommand(change, []string{
+		os.Args[0],
+		"-test.run=^TestAugmentCommandHelper$",
+		"--",
+		"success",
+	})
+
+	then.Nil(t, err)
+	then.MapEquals(t, map[string]string{
+		"Body":           "some body",
+		"Component":      "component",
+		"ExistingCustom": "value",
+		"Filename":       "some_file.yaml",
+		"Kind":           "kind",
+		"KindKey":        "kind-key",
+		"KindLabel":      "Kind Label",
+		"Project":        "project",
+		"Time":           changeTime.Format(time.RFC3339),
+	}, augmented.Custom)
+	then.MapEquals(t, map[string]string{"Existing": "value"}, change.Custom)
+}
+
+func TestAugmentCommandFailure(t *testing.T) {
+	change := Change{}
+
+	_, err := AugmentCommand(change, []string{
+		os.Args[0],
+		"-test.run=^TestAugmentCommandHelper$",
+		"--",
+		"failure",
+	})
+
+	then.NotNil(t, err)
+	then.Contains(t, "helper failure", err.Error())
+}
+
+func TestAugmentCommandInvalidOutput(t *testing.T) {
+	change := Change{}
+
+	_, err := AugmentCommand(change, []string{
+		os.Args[0],
+		"-test.run=^TestAugmentCommandHelper$",
+		"--",
+		"invalid",
+	})
+
+	then.NotNil(t, err)
+}
+
+func TestAugmentCommandHelper(t *testing.T) {
+	mode := os.Args[len(os.Args)-1]
+	if mode == "success" {
+		var change Change
+		then.Nil(t, json.NewDecoder(os.Stdin).Decode(&change))
+		then.Nil(t, json.NewEncoder(os.Stdout).Encode(map[string]string{
+			"Body":           change.Body,
+			"Component":      change.Component,
+			"ExistingCustom": change.Custom["Existing"],
+			"Filename":       change.Filename,
+			"Kind":           change.Kind,
+			"KindKey":        change.KindKey,
+			"KindLabel":      change.KindLabel,
+			"Project":        change.Project,
+			"Time":           change.Time.Format(time.RFC3339),
+		}))
+		os.Exit(0)
+	}
+
+	if mode == "failure" {
+		_, _ = fmt.Fprintln(os.Stderr, "helper failure")
+		os.Exit(1)
+	}
+
+	if mode == "invalid" {
+		_, _ = io.WriteString(os.Stdout, "not json")
+	}
 }
 
 func TestBadYamlFile(t *testing.T) {

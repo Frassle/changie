@@ -1,9 +1,13 @@
 package core
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -118,6 +122,51 @@ func (change *Change) PostProcess(cfg *Config, kind *KindConfig) error {
 	}
 
 	return nil
+}
+
+// AugmentCommand runs a command with the change JSON on stdin and returns a new
+// change with Custom replaced by the JSON object returned on stdout.
+func AugmentCommand(change Change, command []string) (Change, error) {
+	if len(command) == 0 {
+		return change, nil
+	}
+
+	input, err := json.Marshal(change)
+	if err != nil {
+		return change, fmt.Errorf("marshaling change for batch command: %w", err)
+	}
+
+	var (
+		stdout bytes.Buffer
+		stderr bytes.Buffer
+	)
+
+	// #nosec G204 -- the command is explicitly configured by the user.
+	cmd := exec.CommandContext(context.Background(), command[0], command[1:]...)
+	cmd.Stdin = bytes.NewReader(input)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err = cmd.Run()
+	if err != nil {
+		message := strings.TrimSpace(stderr.String())
+		if message != "" {
+			return change, fmt.Errorf("running batch command: %w: %s", err, message)
+		}
+
+		return change, fmt.Errorf("running batch command: %w", err)
+	}
+
+	var custom map[string]string
+
+	err = json.Unmarshal(stdout.Bytes(), &custom)
+	if err != nil {
+		return change, fmt.Errorf("unmarshaling batch command output: %w", err)
+	}
+
+	change.Custom = custom
+
+	return change, nil
 }
 
 // LoadChange will load a change from file path

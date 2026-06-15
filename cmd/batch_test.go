@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -82,6 +83,39 @@ func TestBatchCanBatch(t *testing.T) {
 
 	then.FileContents(t, verContents, cfg.ChangesDir, "v0.2.0.md")
 	then.DirectoryFileCount(t, 0, cfg.ChangesDir, cfg.UnreleasedDir)
+}
+
+func TestBatchAugmentsChanges(t *testing.T) {
+	cfg := batchTestConfig()
+	cfg.ChangeFormat = "* {{.Body}} {{.Custom.Filename}}"
+	cfg.BatchCommand = []string{
+		os.Args[0],
+		"-test.run=^TestBatchAugmentHelper$",
+		"--",
+		"augment",
+	}
+	then.WithTempDirConfig(t, cfg)
+
+	change := &core.Change{Kind: "added", Body: "A"}
+	writeChangeFile(t, cfg, change)
+
+	batch := NewBatch(time.Now, core.NewTemplateCache())
+	err := batch.Run(batch.Command, []string{"v0.2.0"})
+	then.Nil(t, err)
+
+	expected := fmt.Sprintf("## v0.2.0\n### added\n* A %s", change.Filename)
+	then.FileContents(t, expected, cfg.ChangesDir, "v0.2.0.md")
+}
+
+func TestBatchAugmentHelper(t *testing.T) {
+	if os.Args[len(os.Args)-1] != "augment" {
+		return
+	}
+
+	var change core.Change
+	then.Nil(t, json.NewDecoder(os.Stdin).Decode(&change))
+	then.Nil(t, json.NewEncoder(os.Stdout).Encode(map[string]string{"Filename": change.Filename}))
+	os.Exit(0)
 }
 
 func TestBatchCanBatchWithProject(t *testing.T) {

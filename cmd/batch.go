@@ -174,6 +174,13 @@ func (b *Batch) getBatchData() (*core.BatchData, error) {
 		return nil, err
 	}
 
+	for i := range allChanges {
+		allChanges[i], err = core.AugmentCommand(allChanges[i], b.config.BatchCommand)
+		if err != nil {
+			return nil, fmt.Errorf("augmenting change %q: %w", allChanges[i].Filename, err)
+		}
+	}
+
 	if !b.AllowNoChanges && len(allChanges) == 0 {
 		return nil, errNoChangesNotAllowed
 	}

@@ -54,6 +54,7 @@ func TestSaveConfigWithCustomChoicesAndOptionals(t *testing.T) {
 		Components:        []string{"A", "D", "G"},
 		HeaderFormat:      "head",
 		FooterFormat:      "foot",
+		BatchCommand:      []string{"augment", "--flag"},
 		Kinds: []KindConfig{
 			{Label: "B"},
 			{Label: "C"},
@@ -93,6 +94,9 @@ custom:
     - key: first
       type: string
       label: First name
+batchCommand:
+    - augment
+    - --flag
 `
 
 	err := config.Save()
